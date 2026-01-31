@@ -10,11 +10,7 @@ connectDB();
 const app = express();
 app.use(express.json());
 app.use(cors({
-  origin: [
-    "http://localhost:5173",      // local frontend (Vite)
-    "http://localhost:3000",      // if you ever used CRA
-    "https://redico-frontend.vercel.app" // Vercel frontend (we’ll confirm later)
-  ],
+  origin: "https://redico-frontend.vercel.app",
   credentials: true
 }));
 
