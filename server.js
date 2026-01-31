@@ -9,7 +9,14 @@ connectDB();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:5173",      // local frontend (Vite)
+    "http://localhost:3000",      // if you ever used CRA
+    "https://redico-frontend.vercel.app" // Vercel frontend (we’ll confirm later)
+  ],
+  credentials: true
+}));
 
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/books", require("./routes/bookRoutes"));
@@ -23,6 +30,10 @@ app.use("/api/contact", require("./routes/contactRoutes"));
 app.use("/api/addresses", addressRoutes);
 
 require("./jobs/rentalReminder");
+
+app.get("/", (req, res) => {
+  res.send("REDICO backend is running ");
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
