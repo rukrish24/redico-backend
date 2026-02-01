@@ -4,6 +4,7 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const path = require("path");
 const addressRoutes = require("./routes/addressRoutes");
+const adminRentalRoutes = require("./routes/adminRentalRoutes");
 dotenv.config();
 connectDB();
 
@@ -31,6 +32,7 @@ app.use("/api/admin/categories", require("./routes/categoryRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/contact", require("./routes/contactRoutes"));
 app.use("/api/addresses", addressRoutes);
+app.use("/api/admin/rentals", adminRentalRoutes);
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

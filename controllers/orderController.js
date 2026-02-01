@@ -186,10 +186,123 @@ const requestRefund = async (req, res) => {
   }
 };
 
+/* ================= CREATE RAZORPAY ORDER FOR EXTRA FINE ================= */
+const createFinePaymentOrder = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: req.user.id
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const item = order.items.id(itemId);
+
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    if (!item.returned) {
+      return res.status(400).json({ message: "Item not returned yet" });
+    }
+
+    if (item.finePaid) {
+      return res.status(400).json({ message: "Fine already paid" });
+    }
+
+    const deposit = item.safeAmount * item.quantity;
+    const extraFine = Math.max(item.fineAmount - deposit, 0);
+
+    if (extraFine <= 0) {
+      return res.status(400).json({ message: "No extra fine payable" });
+    }
+
+    const razorpayOrder = await razorpay.orders.create({
+      amount: extraFine * 100, // paise
+      currency: "INR",
+      receipt: `fine_${Date.now()}`
+    });
+
+    res.json({
+      razorpayOrderId: razorpayOrder.id,
+      amount: extraFine,
+      keyId: process.env.RAZORPAY_KEY_ID
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+/* ================= VERIFY EXTRA FINE PAYMENT ================= */
+const verifyFinePayment = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderId,
+      itemId
+    } = req.body;
+
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id + "|" + razorpay_payment_id)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Invalid payment signature" });
+    }
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: req.user.id
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const item = order.items.id(itemId);
+
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    if (item.finePaid) {
+      return res.status(400).json({ message: "Fine already paid" });
+    }
+
+    const deposit = item.safeAmount * item.quantity;
+    const extraFine = Math.max(item.fineAmount - deposit, 0);
+
+    item.finePaid = true;
+    item.finePaymentId = razorpay_payment_id;
+    item.extraFinePaidAmount = extraFine;
+
+    await order.save();
+
+    res.json({
+      message: "Extra fine paid successfully",
+      extraFinePaid: extraFine
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyPayment,
   getMyOrders,
   cancelOrder,
-  requestRefund
+  requestRefund,
+  createFinePaymentOrder,
+  verifyFinePayment
 };

@@ -26,11 +26,21 @@ exports.returnRental = async (req, res) => {
     item.returnDate = new Date();
 
     /* ================= OVERDUE CALC ================= */
-    let overdueDays = 0;
-    if (item.dueDate && new Date() > item.dueDate) {
-      const diffMs = Date.now() - new Date(item.dueDate).getTime();
-      overdueDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  let overdueDays = 0;
+
+    if (item.dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const dueDate = new Date(item.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+
+      if (today > dueDate) {
+        const diffMs = today - dueDate;
+        overdueDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      }
     }
+
     item.overdueDays = overdueDays;
 
     /* ================= FINE ================= */
@@ -69,39 +79,52 @@ exports.returnRental = async (req, res) => {
  * GET /api/admin/rentals/overdue
  */
 exports.getOverdueRentals = async (req, res) => {
+
+  
+
   try {
-    const now = new Date();
+    // normalize "today" to start of day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const orders = await Order.find({
       "items.type": "rent",
-      "items.dueDate": { $lt: now },
       "items.returned": { $ne: true }
     })
-      .populate("items.book")
+      .populate({
+  path: "items.book",
+  select: "title image"
+})
       .populate("user", "name email");
 
     const result = [];
 
     orders.forEach(order => {
       order.items.forEach(item => {
-        if (
-          item.type === "rent" &&
-          item.dueDate &&
-          new Date(item.dueDate) < now &&
-          !item.returned
-        ) {
+        if (item.type !== "rent" || item.returned || !item.dueDate) return;
+
+        const dueDate = new Date(item.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+
+        // Overdue ONLY if today > dueDate
+        if (today > dueDate) {
+          const diffMs = today - dueDate;
+          const overdueDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
           result.push({
             orderId: order._id,
             itemId: item._id,
             book: item.book,
             user: order.user,
             dueDate: item.dueDate,
-            overdueDays: item.overdueDays || 0,
-            fineAmount: item.fineAmount || 0
+            overdueDays,
+            fineAmount: overdueDays > 0 ? overdueDays * 20 : 0 // preview only
           });
         }
       });
     });
+
+    
 
     res.json(result);
   } catch (err) {

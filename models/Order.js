@@ -13,7 +13,15 @@ const orderItemSchema = new mongoose.Schema({
   returnDate: { type: Date },
   overdueDays: { type: Number, default: 0 },
   fineAmount: { type: Number, default: 0 }, // optional fine for overdue
-  safeAmount: { type: Number, default: 0 }
+
+  depositDeducted: { type: Number, default: 0 },
+  depositRefund: { type: Number, default: 0 },
+
+  safeAmount: { type: Number, default: 0 },
+  finePaid: { type: Boolean, default: false },
+  finePaymentId: { type: String },
+  extraFinePaidAmount: { type: Number, default: 0 },
+
 });
 
 const refundSchema = new mongoose.Schema({
